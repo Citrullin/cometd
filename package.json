@@ -1,0 +1,24 @@
+{
+  "name": "cometd",
+  "version": "0.5.3",
+  "description": "A lightweight cometD Library with lightweight dependencies. No jQuery needed!",
+  "main": "cometD.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Citrullin/cometd.git"
+  },
+  "keywords": [
+    "cometd",
+    "streaming",
+    "bayeux"
+  ],
+  "author": "Philipp Blum",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Citrullin/cometd/issues"
+  },
+  "homepage": "https://github.com/Citrullin/cometd#readme"
+}
