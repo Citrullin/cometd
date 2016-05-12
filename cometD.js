@@ -5,16 +5,16 @@ exports.cometD = function () {
         token: false,
         url: ""
     };
-    var jar = request.jar();
     var handshaked = false;
     var requestId = 1;
 
     var clientId = "";
 
-    var stop = false;
-
     return {
+        jar: request.jar(),
+        stop: true,
         topic: "",
+        errorNoResponse: 0,
         errorMultiple: 0,
         errorTimeout: 0,
         debug: false,
@@ -29,7 +29,7 @@ exports.cometD = function () {
             this.handshake();
         },
         connect: function () {
-            if (!stop) {
+            if (!this.stop) {
                 if(this.debug){
                     console.log('[' + this.topic + ']: Conneting...\n');
                 }
@@ -79,8 +79,8 @@ exports.cometD = function () {
                                             console.log('[Connect] [' + self.topic + '] Too many Timeout Errors. Reinitialize...\n')
                                         }
 
+                                        self.stop = true;
                                         self.reInitialization();
-                                        self.stop();
                                     }else{
                                         if(self.debug){
                                             console.log('[Connect] [' + self.topic + '] Timeout. Reconnect...\n');
@@ -95,8 +95,9 @@ exports.cometD = function () {
                                             //Reconnect
                                             self.connect();
                                             //Set timeout Error to zero
-                                            self.errorTimeout  = 0;
-                                            self.errorMultiple = 0;
+                                            self.errorTimeout       = 0;
+                                            self.errorMultiple      = 0;
+                                            self.errorNoResponse    = 0;
 
                                             if(self.debug){
                                                 console.log(
@@ -119,8 +120,8 @@ exports.cometD = function () {
                                                     'Handshaking...\n'
                                                 );
                                             }
+                                            self.stop = true;
                                             self.reInitialization();
-                                            self.stop();
                                             nothing = false;
                                         }else if(!!body[i].advice && !!body[i].advice['multiple-clients']){
 
@@ -133,13 +134,14 @@ exports.cometD = function () {
                                                     );
                                                 }
 
+                                                self.stop = true;
                                                 self.reInitialization();
-                                                self.stop();
                                             }else{
                                                 //Reconnect
                                                 self.connect();
                                                 //Set timeout Error to zero
-                                                self.errorTimeout = 0;
+                                                self.errorTimeout       = 0;
+                                                self.errorNoResponse    = 0;
                                                 //Set increment errorMultiple
                                                 self.errorMultiple++;
 
@@ -153,8 +155,9 @@ exports.cometD = function () {
                                             //Reconnect
                                             self.connect();
                                             //Set timeout Error to zero
-                                            self.errorTimeout   = 0;
-                                            self.errorMultiple  = 0;
+                                            self.errorTimeout    = 0;
+                                            self.errorMultiple   = 0;
+                                            self.errorNoResponse = 0;
 
                                             if(self.debug){
                                                 if(self.timeout !== body[i].advice.timeout){
@@ -173,22 +176,31 @@ exports.cometD = function () {
                                         self.errorTimeout = 0;
                                     }
                                 }else if(!response){
-                                    //Reconnect
-                                    self.connect();
-                                    //Set timeout Error to zero
-                                    self.errorTimeout   = 0;
-                                    self.errorMultiple  = 0;
+                                    if(self.errorNoResponse > 10){
+                                        if(self.debug){
+                                            console.log('[Connect] [' + self.topic + '] Got to many empty responses. Reinitialize...\n');
+                                        }
 
-                                    if(self.debug){
-                                        console.log('[Connect] [' + self.topic + '] Response: ' + response + '\n');
+                                        self.stop = true;
+                                        self.reInitialization();
+                                    }else{
+                                        //Reconnect
+                                        self.connect();
+                                        //Set timeout Error to zero
+                                        self.errorNoResponse++;
+                                        self.errorTimeout   = 0;
+                                        self.errorMultiple  = 0;
+
+                                        if(self.debug){
+                                            console.log('[Connect] [' + self.topic + '] Empty response. Reconnect...\n');
+                                        }
                                     }
-                                    console.log('[Connect] [' + self.topic + '] Empty response. Reconnect...\n');
                                 }else{
                                     if(self.debug){
                                         console.log('[Connect] [' + self.topic + '] Got an error. Reinitialize...\n');
                                     }
+                                    self.stop = true;
                                     self.reInitialization();
-                                    self.stop();
                                 }
                             }else if(error && error.code === 'ETIMEDOUT'){
                                     //Reconnect
@@ -211,7 +223,7 @@ exports.cometD = function () {
 
                 request(
                     {
-                        jar: jar,
+                        jar: this.jar,
                         timeout: this.timeout,
                         gzip: true,
                         url: config.url,
@@ -260,10 +272,8 @@ exports.cometD = function () {
                             clientId = body[0].clientId;
                             handshaked = true;
                             requestId++;
+                            self.stop = false;
                             self.notify('/meta/handshake', body);
-                            self.addEventListener('/meta/subscribe', function(){
-                                self.connect();
-                            });
                             self.subscribe();
 
                         }else{
@@ -281,7 +291,7 @@ exports.cometD = function () {
 
             request(
                 {
-                    jar: jar,
+                    jar: this.jar,
                     gzip: true,
                     url: config.url,
                     method: 'POST',
@@ -293,7 +303,7 @@ exports.cometD = function () {
         },
         subscribe: function () {
 
-            if(!stop){
+            if(!this.stop){
 
                 if (handshaked) {
                     if(config.debug){
@@ -328,7 +338,7 @@ exports.cometD = function () {
 
                                 if(!!body && body[0].successful){
                                     self.notify('/meta/subscribe', body);
-                                    self.start();
+                                    self.connect();
                                 }
                                 else if (!body || !body[0].successful) {
                                     setTimeout(self.subscribe, 1000);
@@ -347,7 +357,7 @@ exports.cometD = function () {
 
                     request(
                         {
-                            jar: jar,
+                            jar: this.jar,
                             gzip: true,
                             url: config.url,
                             method: 'POST',
@@ -375,21 +385,13 @@ exports.cometD = function () {
                 }
             }
         },
-        stop: function () {
-            stop = true;
-        },
-        start: function(){
-            stop = false;
-        },
         reInitialization: function(){
                 function HandshakeListener(){
                     var self;
                     return {
                         setSelf: function(object){
                             self = object;
-                        },
-                        onEvent: function(){
-                            self.subscribe(self.topic);
+                            //self.jar.removeCookies(config.url);
                         }
                     }
                 }
@@ -397,9 +399,8 @@ exports.cometD = function () {
                 var handshakeListener = new HandshakeListener();
                 handshakeListener.setSelf(this);
 
-                this.addEventListener('/meta/handshake', handshakeListener.onEvent);
                 this.handshake();
-            }
+        }
 
     }
 };
