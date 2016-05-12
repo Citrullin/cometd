@@ -1,5 +1,9 @@
 ##A Simple HowTo:
 
+Install the library
+
+        npm install --save cometd
+
 Include the library
 
         var cometD = require('cometd').cometD();
